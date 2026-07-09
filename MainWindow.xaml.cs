@@ -608,9 +608,9 @@ namespace GeekDesk
                 //ShowWindowFollowMouse.FollowMouse(mainWindow);
             }
 
-
-            MainWindow.mainWindow.Activate();
             mainWindow.Show();
+            WindowUtil.ApplyTopmostSetting(mainWindow, appData.AppConfig.AlwaysTopmost == true);
+            MainWindow.mainWindow.Activate();
             //mainWindow.Visibility = Visibility.Visible;
             if (appData.AppConfig.AppAnimation)
             {
