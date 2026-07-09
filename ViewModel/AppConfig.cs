@@ -68,7 +68,7 @@ namespace GeekDesk.ViewModel
         private bool blurEffect = true; //毛玻璃效果 默认是
         private double blurValue;
 
-        private UpdateType updateType = UpdateType.Gitee; //更新源 默认gitee源
+        private UpdateType updateType = UpdateType.GitHub; //更新源 默认GitHub源
 
         private bool selfStartUp = true; //开机自启动设置
         private bool selfStartUped = false;  //是否已设置
@@ -718,6 +718,10 @@ namespace GeekDesk.ViewModel
         {
             get
             {
+                if (updateType != UpdateType.GitHub)
+                {
+                    updateType = UpdateType.GitHub;
+                }
                 return updateType;
             }
             set

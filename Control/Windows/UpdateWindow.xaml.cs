@@ -1,12 +1,10 @@
 ﻿using GeekDesk.Constant;
 using GeekDesk.Interface;
 using GeekDesk.Util;
-using GeekDesk.ViewModel;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Configuration;
 using System.Diagnostics;
-using System.Net;
 using System.Windows;
 using System.Windows.Input;
 
@@ -17,9 +15,7 @@ namespace GeekDesk.Control.Windows
     /// </summary>
     public partial class UpdateWindow : Window, IWindowCommon
     {
-        private static AppConfig appConfig = MainWindow.appData.AppConfig;
         private static string githubUrl = "";
-        private static string giteeUrl = "";
         private UpdateWindow(JObject jo)
         {
             try
@@ -57,7 +53,6 @@ namespace GeekDesk.Control.Windows
             MsgTitle.Text = StringUtil.IsEmpty(jo["msgTitle"]) ? "" : jo["msgTitle"].ToString();
             JArray ja = JArray.Parse(StringUtil.IsEmpty(jo["msg"]) ? "[]" : jo["msg"].ToString());
             githubUrl = StringUtil.IsEmpty(jo["githubUrl"]) ? ConfigurationManager.AppSettings["GitHubUrl"] : jo["githubUrl"].ToString();
-            giteeUrl = StringUtil.IsEmpty(jo["giteeUrl"]) ? ConfigurationManager.AppSettings["GiteeUrl"] : jo["giteeUrl"].ToString();
             string msg = "";
             for (int i = 0; i < ja.Count; i++)
             {
@@ -73,21 +68,7 @@ namespace GeekDesk.Control.Windows
 
         private void Confirm_Click(object sender, RoutedEventArgs e)
         {
-            string packageUrl;
-            switch (appConfig.UpdateType)
-            {
-                case UpdateType.GitHub:
-                    packageUrl = githubUrl;
-                    break;
-                default:
-                    packageUrl = giteeUrl;
-                    break;
-            }
-            Process.Start(new ProcessStartInfo("cmd", $"/c start {packageUrl}")
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
+            OpenLinkUrl(githubUrl);
             this.Close();
         }
 
@@ -114,46 +95,7 @@ namespace GeekDesk.Control.Windows
 
         private void StarBtnClick(object sender, RoutedEventArgs e)
         {
-
-            string githubUrl = ConfigurationManager.AppSettings["GitHubUrl"];
-            string giteeUrl = ConfigurationManager.AppSettings["GiteeUrl"];
-
-            if(!ReqGitUrl(githubUrl))
-            {
-                if (!ReqGitUrl(giteeUrl))
-                {
-                    OpenLinkUrl(githubUrl);
-                } else
-                {
-                    OpenLinkUrl(giteeUrl);
-                }
-            } else
-            {
-                OpenLinkUrl(githubUrl);
-            }
-        }
-
-
-        private bool ReqGitUrl(String url)
-        {
-            HttpWebResponse myResponse = null;
-            try
-            {
-                ServicePointManager.Expect100Continue = true;
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                //创建Web访问对  象
-                WebRequest myRequest = WebRequest.Create(url);
-
-                myRequest.ContentType = "text/plain; charset=utf-8";
-                //通过Web访问对象获取响应内容
-                myResponse = (HttpWebResponse)myRequest.GetResponse();
-            }
-            catch 
-            {
-                return false;
-            }
-
-            return myResponse != null && myResponse.StatusCode == HttpStatusCode.OK;
+            OpenLinkUrl(ConfigurationManager.AppSettings["GitHubUrl"]);
         }
 
         private void OpenLinkUrl(String url)

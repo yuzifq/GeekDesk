@@ -92,16 +92,11 @@
                 </hc:UniformSpacingPanel>
                 <TextBlock Text="更新源"  Margin="0,25,0,0"/>
                 <hc:UniformSpacingPanel Spacing="10" Margin="20,8,0,0">
-                    <RadioButton Margin="10,0,0,0" 
-                             Style="{StaticResource MyRadioBtnStyle}" Content="Gitee"
-                             hc:IconElement.Geometry="{StaticResource Gitee}"
-                             Foreground="#B32225"
-                             IsChecked="{Binding UpdateType, Mode=TwoWay, Converter={StaticResource UpdateTypeConvert}, ConverterParameter=1}"/>
                     <RadioButton Margin="10,0,0,0"
                              hc:IconElement.Geometry="{StaticResource GitHub}"
                              Style="{StaticResource MyRadioBtnStyle}" Content="GitHub" 
                              Foreground="Black"
-                             IsChecked="{Binding UpdateType, Mode=TwoWay, Converter={StaticResource UpdateTypeConvert}, ConverterParameter=2}"/>
+                             IsChecked="{Binding UpdateType, Mode=TwoWay, Converter={StaticResource UpdateTypeConvert}, ConverterParameter=1}"/>
                 </hc:UniformSpacingPanel>
 
                 <TextBlock Text="其它"  Margin="0,25,0,0"/>

@@ -5,7 +5,6 @@ namespace GeekDesk.Constant
 {
     public enum UpdateType
     {
-        Gitee = 1,
-        GitHub = 2
+        GitHub = 1
     }
 }

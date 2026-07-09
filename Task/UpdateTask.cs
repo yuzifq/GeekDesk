@@ -1,7 +1,6 @@
 ﻿using GeekDesk.Constant;
 using GeekDesk.Control.Windows;
 using GeekDesk.Util;
-using GeekDesk.ViewModel;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -15,7 +14,6 @@ namespace GeekDesk.Task
     internal class UpdateTask
     {
 
-        private static AppConfig appConfig = MainWindow.appData.AppConfig;
         public static void Start()
         {
             System.Timers.Timer timer = new System.Timers.Timer
@@ -32,42 +30,12 @@ namespace GeekDesk.Task
         {
             try
             {
-                string updateUrl = ConfigurationManager.AppSettings["GiteeUpdateUrl"];
+                string updateUrl = ConfigurationManager.AppSettings["GitHubUpdateUrl"];
                 string nowVersion = ConfigurationManager.AppSettings["Version"];
-                if (appConfig != null)
-                {
-                    switch (appConfig.UpdateType)
-                    {
-                        case UpdateType.GitHub:
-                            updateUrl = ConfigurationManager.AppSettings["GitHubUpdateUrl"];
-                            break;
-                        default:
-                            updateUrl = ConfigurationManager.AppSettings["GiteeUpdateUrl"];
-                            break;
-                    }
-                }
                 string updateInfo = HttpUtil.Get(updateUrl);
                 if (!StringUtil.IsEmpty(updateInfo))
                 {
                     JObject jo = JObject.Parse(updateInfo);
-
-                    try
-                    {
-                        if (jo["statisticUrl"] != null)
-                        {
-                            string statisticUrl = jo["statisticUrl"].ToString();
-                            if (!string.IsNullOrEmpty(statisticUrl))
-                            {
-                                //用户统计  只通过uuid统计用户数量  不收集任何信息
-                                statisticUrl += "?uuid=" + CommonCode.GetUniqueUUID();
-                                HttpUtil.Get(statisticUrl);
-                            }
-                        }
-                    }
-                    catch (Exception) { }
-
-
-
                     string onlineVersion = jo["version"].ToString();
                     if (onlineVersion.CompareTo(nowVersion) > 0)
                     {
