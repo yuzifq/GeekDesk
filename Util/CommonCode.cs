@@ -30,9 +30,8 @@ namespace GeekDesk.Util
         public static AppData GetAppDataByFile()
         {
             AppData appData;
-            if (!File.Exists(Constants.DATA_FILE_PATH))
+            if (!File.Exists(Constants.DATA_FILE_PATH) || new FileInfo(Constants.DATA_FILE_PATH).Length == 0)
             {
-                using (FileStream fs = File.Create(Constants.DATA_FILE_PATH)) { }
                 appData = new AppData();
                 SaveAppData(appData, Constants.DATA_FILE_PATH);
                 return appData;
@@ -56,6 +55,10 @@ namespace GeekDesk.Util
                 }
                 catch
                 {
+                    if (!Directory.Exists(Constants.DATA_FILE_BAK_DIR_PATH))
+                    {
+                        Directory.CreateDirectory(Constants.DATA_FILE_BAK_DIR_PATH);
+                    }
                     DirectoryInfo dirInfo = new DirectoryInfo(Constants.DATA_FILE_BAK_DIR_PATH);
                     FileInfo[] files = dirInfo.GetFiles()
                         .Where(f => f.Extension.Equals(".bak", StringComparison.OrdinalIgnoreCase)).ToArray(); ;
@@ -179,6 +182,11 @@ namespace GeekDesk.Util
 
         public static void SavePassword(string password)
         {
+            string dirPath = Path.GetDirectoryName(Constants.PW_FILE_BAK_PATH);
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
             using (StreamWriter sw = new StreamWriter(Constants.PW_FILE_BAK_PATH))
             {
                 sw.Write(password);
@@ -394,24 +402,7 @@ namespace GeekDesk.Util
         /// <returns></returns>
         public static bool MouseInWindow(Window window)
         {
-            double windowHeight = window.Height;
-            double windowWidth = window.Width;
-
-            double windowTop = window.Top;
-            double windowLeft = window.Left;
-
-            //获取鼠标位置
-            System.Windows.Point p = MouseUtil.GetMousePosition();
-            double mouseX = p.X;
-            double mouseY = p.Y;
-
-            //鼠标不在窗口上
-            if (mouseX < windowLeft || mouseX > windowLeft + windowWidth
-                || mouseY < windowTop || mouseY > windowTop + windowHeight)
-            {
-                return false;
-            }
-            return true;
+            return MouseUtil.IsMouseInWindow(window);
         }
 
     }

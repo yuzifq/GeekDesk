@@ -27,10 +27,10 @@ namespace GeekDesk.Util
 
                     if (ex != null)
                     {
-                        buffer = Encoding.Default.GetBytes("成员名: " + ex.TargetSite + "\r\n");
+                        buffer = Encoding.Default.GetBytes("成员名: " + (ex.TargetSite == null ? "" : ex.TargetSite.ToString()) + "\r\n");
                         fs.Write(buffer, 0, buffer.Length);
 
-                        buffer = Encoding.Default.GetBytes("引发异常的类: " + ex.TargetSite.DeclaringType + "\r\n");
+                        buffer = Encoding.Default.GetBytes("引发异常的类: " + (ex.TargetSite?.DeclaringType == null ? "" : ex.TargetSite.DeclaringType.ToString()) + "\r\n");
                         fs.Write(buffer, 0, buffer.Length);
 
                         buffer = Encoding.Default.GetBytes("异常信息: " + ex.Message + "\r\n");

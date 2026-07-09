@@ -12,6 +12,7 @@ namespace GeekDesk.Util
 
     enum HideType
     {
+        NONE = 0,
         TOP_SHOW = 1,
         LEFT_SHOW = 2,
         RIGHT_SHOW = 3,
@@ -40,10 +41,13 @@ namespace GeekDesk.Util
 
 
         private static double showMarginWidth = 1;
+        private static double showTriggerWidth = 4;
+        private static double edgePositionTolerance = 2;
 
         public static bool IS_HIDE = false;
 
         private static System.Windows.Forms.Timer timer = null;
+        private static HideType lastHiddenShowType = HideType.NONE;
 
         public static void ReadyHide(Window window)
         {
@@ -57,9 +61,10 @@ namespace GeekDesk.Util
         /// <returns></returns>
         public static bool IsMargin()
         {
-            double screenLeft = SystemParameters.VirtualScreenLeft;
-            double screenTop = SystemParameters.VirtualScreenTop;
-            double screenWidth = SystemParameters.VirtualScreenWidth;
+            Rect screenBounds = MouseUtil.GetVirtualScreenBounds(window);
+            double screenLeft = screenBounds.Left;
+            double screenTop = screenBounds.Top;
+            double screenRight = screenBounds.Right;
 
             double windowWidth = window.Width;
 
@@ -69,7 +74,7 @@ namespace GeekDesk.Util
             //窗体是否贴边
             return (windowLeft <= screenLeft
                 || windowTop <= screenTop
-                || windowLeft + windowWidth + Math.Abs(screenLeft) >= screenWidth);
+                || windowLeft + windowWidth >= screenRight);
         }
 
 
@@ -77,85 +82,251 @@ namespace GeekDesk.Util
         #region 窗体贴边隐藏功能
         private static void HideWindow(object o, EventArgs e)
         {
-            if (RunTimeStatus.MARGIN_HIDE_AND_OTHER_SHOW 
-                || RunTimeStatus.LOCK_APP_PANEL) return;
-
-            double screenLeft = SystemParameters.VirtualScreenLeft;
-            double screenTop = SystemParameters.VirtualScreenTop;
-            double screenWidth = SystemParameters.VirtualScreenWidth;
-
-            double windowHeight = window.Height;
-            double windowWidth = window.Width;
-
-            double windowTop = window.Top;
-            double windowLeft = window.Left;
-
-            //获取鼠标位置
-            System.Windows.Point p = MouseUtil.GetMousePosition();
-            double mouseX = p.X;
-            double mouseY = p.Y;
-
-            //鼠标不在窗口上
-            if ((mouseX < windowLeft || mouseX > windowLeft + windowWidth
-                || mouseY < windowTop || mouseY > windowTop + windowHeight) && !IS_HIDE && window.Visibility == Visibility.Visible)
+            try
             {
-                //上方隐藏条件
-                if (windowTop <= screenTop)
+                if (window == null) return;
+
+                if (RunTimeStatus.MARGIN_HIDE_AND_OTHER_SHOW
+                    || RunTimeStatus.LOCK_APP_PANEL) return;
+
+                Rect screenBounds = MouseUtil.GetVirtualScreenBounds(window);
+                double screenLeft = screenBounds.Left;
+                double screenTop = screenBounds.Top;
+                double screenRight = screenBounds.Right;
+
+                double windowHeight = GetWindowHeight();
+                double windowWidth = GetWindowWidth();
+
+                double windowTop = window.Top;
+                double windowLeft = window.Left;
+
+                bool mouseInWindow = MouseUtil.IsMouseInWindow(window);
+                HideType hiddenShowType = GetCurrentHiddenShowType(screenLeft, screenTop, screenRight, windowLeft, windowTop);
+                bool mouseOnHiddenEdge = IsMouseOnHiddenEdge(screenLeft, screenTop, screenRight, windowLeft, windowTop, windowWidth, windowHeight, hiddenShowType);
+
+                //鼠标不在窗口上
+                if (!mouseInWindow && !IS_HIDE && window.Visibility == Visibility.Visible)
                 {
-                    IS_HIDE = true;
-                    //FadeAnimation(1, 0);
-                    HideAnimation(windowTop, screenTop - windowHeight + showMarginWidth, Window.TopProperty, HideType.TOP_HIDE);
-                    return;
+                    //上方隐藏条件
+                    if (windowTop <= screenTop)
+                    {
+                        IS_HIDE = true;
+                        lastHiddenShowType = HideType.TOP_SHOW;
+                        //FadeAnimation(1, 0);
+                        HideAnimation(windowTop, screenTop - windowHeight + showMarginWidth, Window.TopProperty, HideType.TOP_HIDE);
+                        return;
+                    }
+                    //左侧隐藏条件
+                    if (windowLeft <= screenLeft)
+                    {
+                        IS_HIDE = true;
+                        lastHiddenShowType = HideType.LEFT_SHOW;
+                        //FadeAnimation(1, 0);
+                        HideAnimation(windowLeft, screenLeft - windowWidth + showMarginWidth, Window.LeftProperty, HideType.LEFT_HIDE);
+                        return;
+                    }
+                    //右侧隐藏条件
+                    if (windowLeft + windowWidth >= screenRight)
+                    {
+                        IS_HIDE = true;
+                        lastHiddenShowType = HideType.RIGHT_SHOW;
+                        //FadeAnimation(1, 0);
+                        HideAnimation(windowLeft, screenRight - showMarginWidth, Window.LeftProperty, HideType.RIGHT_HIDE);
+                        return;
+                    }
                 }
-                //左侧隐藏条件
-                if (windowLeft <= screenLeft)
+                else if (mouseOnHiddenEdge && IS_HIDE && window.Visibility != Visibility.Visible)
                 {
-                    IS_HIDE = true;
-                    //FadeAnimation(1, 0);
-                    HideAnimation(windowLeft, screenLeft - windowWidth + showMarginWidth, Window.LeftProperty, HideType.LEFT_HIDE);
-                    return;
-                }
-                //右侧隐藏条件
-                if (windowLeft + windowWidth + Math.Abs(screenLeft) >= screenWidth)
-                {
-                    IS_HIDE = true;
-                    //FadeAnimation(1, 0);
-                    HideAnimation(windowLeft, screenWidth - Math.Abs(screenLeft) - showMarginWidth, Window.LeftProperty, HideType.RIGHT_HIDE);
-                    return;
+                    window.Show();
+                    IS_HIDE = false;
+                    ClearHiddenState();
+                    switch (hiddenShowType)
+                    {
+                        case HideType.TOP_SHOW:
+                            HideAnimation(windowTop, screenTop, Window.TopProperty, HideType.TOP_SHOW);
+                            return;
+                        case HideType.LEFT_SHOW:
+                            HideAnimation(windowLeft, screenLeft, Window.LeftProperty, HideType.LEFT_SHOW);
+                            return;
+                        case HideType.RIGHT_SHOW:
+                            HideAnimation(windowLeft, screenRight - windowWidth, Window.LeftProperty, HideType.RIGHT_SHOW);
+                            return;
+                        default:
+                            IS_HIDE = true;
+                            return;
+                    }
                 }
             }
-            else if (mouseX >= windowLeft && mouseX <= windowLeft + windowWidth
-              && mouseY >= windowTop && mouseY <= windowTop + windowHeight && IS_HIDE && window.Visibility != Visibility.Visible)
+            catch (Exception ex)
             {
-                window.Show();
-                //上方显示
-                if (windowTop <= screenTop - showMarginWidth)
-                {
-                    IS_HIDE = false;
-                    HideAnimation(windowTop, screenTop, Window.TopProperty, HideType.TOP_SHOW);
-                    //FadeAnimation(0, 1);
-                    return;
-                }
-                //左侧显示
-                if (windowLeft <= screenLeft - showMarginWidth)
-                {
-                    IS_HIDE = false;
-                    HideAnimation(windowLeft, screenLeft, Window.LeftProperty, HideType.LEFT_SHOW);
-                    //FadeAnimation(0, 1);
-                    return;
-                }
-                //右侧显示
-                if (windowLeft + Math.Abs(screenLeft) == screenWidth - showMarginWidth)
-                {
-                    IS_HIDE = false;
-                    HideAnimation(windowLeft, screenWidth - Math.Abs(screenLeft) - windowWidth, Window.LeftProperty, HideType.RIGHT_SHOW);
-                    //FadeAnimation(0, 1);
-                    return;
-                }
+                LogUtil.WriteErrorLog(ex, "贴边隐藏处理异常!");
             }
 
         }
-        #endregion 
+        #endregion
+
+        private static HideType GetHiddenShowType(double screenLeft, double screenTop, double screenRight, double windowLeft, double windowTop)
+        {
+            if (windowLeft <= screenLeft - showMarginWidth)
+            {
+                return HideType.LEFT_SHOW;
+            }
+
+            if (windowTop <= screenTop - showMarginWidth)
+            {
+                return HideType.TOP_SHOW;
+            }
+
+            if (Math.Abs(windowLeft - (screenRight - showMarginWidth)) <= edgePositionTolerance)
+            {
+                return HideType.RIGHT_SHOW;
+            }
+
+            return HideType.NONE;
+        }
+
+        private static HideType GetCurrentHiddenShowType(double screenLeft, double screenTop, double screenRight, double windowLeft, double windowTop)
+        {
+            HideType hiddenShowType = GetHiddenShowType(screenLeft, screenTop, screenRight, windowLeft, windowTop);
+            if (hiddenShowType != HideType.NONE)
+            {
+                return hiddenShowType;
+            }
+
+            return lastHiddenShowType;
+        }
+
+        private static bool IsMouseOnHiddenEdge(double screenLeft, double screenTop, double screenRight, double windowLeft, double windowTop, double windowWidth, double windowHeight, HideType hiddenShowType)
+        {
+            if (!IS_HIDE || window.Visibility == Visibility.Visible)
+            {
+                return false;
+            }
+
+            Point mousePosition = MouseUtil.GetMouseLogicalScreenPosition(window);
+            bool mouseInWindowHeight = mousePosition.Y >= windowTop && mousePosition.Y <= windowTop + windowHeight;
+            bool mouseInWindowWidth = mousePosition.X >= windowLeft && mousePosition.X <= windowLeft + windowWidth;
+
+            switch (hiddenShowType)
+            {
+                case HideType.LEFT_SHOW:
+                    return mousePosition.X <= screenLeft + showTriggerWidth && mouseInWindowHeight;
+                case HideType.TOP_SHOW:
+                    return mousePosition.Y <= screenTop + showTriggerWidth && mouseInWindowWidth;
+                case HideType.RIGHT_SHOW:
+                    return mousePosition.X >= screenRight - showTriggerWidth && mouseInWindowHeight;
+                default:
+                    return false;
+            }
+        }
+
+        private static void ClearHiddenState()
+        {
+            lastHiddenShowType = HideType.NONE;
+        }
+
+        public static void CancelHiddenState()
+        {
+            IS_HIDE = false;
+            ClearHiddenState();
+        }
+
+        public static void ShowHiddenWindowForDisplayChange()
+        {
+            try
+            {
+                if (window == null || !IS_HIDE)
+                {
+                    return;
+                }
+
+                Rect screenBounds = MouseUtil.GetVirtualScreenBounds(window);
+                double windowWidth = GetWindowWidth();
+                double windowHeight = GetWindowHeight();
+                HideType hiddenShowType = ResolveHiddenShowType(screenBounds, windowWidth, windowHeight);
+
+                RestoreHiddenWindowToVisibleBounds(screenBounds, hiddenShowType, windowWidth, windowHeight);
+                IS_HIDE = false;
+                ClearHiddenState();
+                RunTimeStatus.MARGIN_HIDE_AND_OTHER_SHOW = false;
+                window.Opacity = 1;
+                window.Visibility = Visibility.Visible;
+                WindowUtil.SendToBottomNoActivate(window);
+            }
+            catch (Exception ex)
+            {
+                LogUtil.WriteErrorLog(ex, "显示设置变化后恢复贴边隐藏窗口异常!");
+            }
+        }
+
+        private static void RestoreHiddenWindowToVisibleBounds(Rect screenBounds, HideType hiddenShowType, double windowWidth, double windowHeight)
+        {
+            switch (hiddenShowType)
+            {
+                case HideType.LEFT_SHOW:
+                    window.Left = screenBounds.Left;
+                    window.Top = Clamp(GetValidCoordinate(window.Top, screenBounds.Top), screenBounds.Top, screenBounds.Bottom - windowHeight);
+                    break;
+                case HideType.TOP_SHOW:
+                    window.Left = Clamp(GetValidCoordinate(window.Left, screenBounds.Left), screenBounds.Left, screenBounds.Right - windowWidth);
+                    window.Top = screenBounds.Top;
+                    break;
+                case HideType.RIGHT_SHOW:
+                    window.Left = screenBounds.Right - windowWidth;
+                    window.Top = Clamp(GetValidCoordinate(window.Top, screenBounds.Top), screenBounds.Top, screenBounds.Bottom - windowHeight);
+                    break;
+                default:
+                    window.Left = Clamp(GetValidCoordinate(window.Left, screenBounds.Left), screenBounds.Left, screenBounds.Right - windowWidth);
+                    window.Top = Clamp(GetValidCoordinate(window.Top, screenBounds.Top), screenBounds.Top, screenBounds.Bottom - windowHeight);
+                    break;
+            }
+        }
+
+        private static HideType ResolveHiddenShowType(Rect screenBounds, double windowWidth, double windowHeight)
+        {
+            HideType hiddenShowType = GetCurrentHiddenShowType(screenBounds.Left, screenBounds.Top, screenBounds.Right, window.Left, window.Top);
+            if (hiddenShowType != HideType.NONE)
+            {
+                return hiddenShowType;
+            }
+
+            double windowLeft = GetValidCoordinate(window.Left, screenBounds.Right - showMarginWidth);
+            double windowTop = GetValidCoordinate(window.Top, screenBounds.Top);
+            double leftHiddenPosition = screenBounds.Left - windowWidth + showMarginWidth;
+            double topHiddenPosition = screenBounds.Top - windowHeight + showMarginWidth;
+            double rightHiddenPosition = screenBounds.Right - showMarginWidth;
+
+            double leftDistance = Math.Abs(windowLeft - leftHiddenPosition);
+            double topDistance = Math.Abs(windowTop - topHiddenPosition);
+            double rightDistance = Math.Abs(windowLeft - rightHiddenPosition);
+
+            if (topDistance <= leftDistance && topDistance <= rightDistance)
+            {
+                return HideType.TOP_SHOW;
+            }
+
+            return leftDistance <= rightDistance ? HideType.LEFT_SHOW : HideType.RIGHT_SHOW;
+        }
+
+        private static bool IsValidCoordinate(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static double GetValidCoordinate(double value, double fallback)
+        {
+            return IsValidCoordinate(value) ? value : fallback;
+        }
+
+        private static double Clamp(double value, double min, double max)
+        {
+            if (max < min)
+            {
+                return min;
+            }
+
+            return Math.Max(min, Math.Min(max, value));
+        }
 
 
         public static void StartHide()
@@ -180,43 +351,71 @@ namespace GeekDesk.Util
             //功能关闭 如果界面是隐藏状态  那么要显示界面 ↓
             if (IS_HIDE)
             {
-                double screenLeft = SystemParameters.VirtualScreenLeft;
-                double screenTop = SystemParameters.VirtualScreenTop;
-                double screenWidth = SystemParameters.VirtualScreenWidth;
+                Rect screenBounds = MouseUtil.GetVirtualScreenBounds(window);
+                double screenLeft = screenBounds.Left;
+                double screenTop = screenBounds.Top;
+                double screenRight = screenBounds.Right;
 
-                double windowWidth = window.Width;
+                double windowWidth = GetWindowWidth();
 
                 double windowTop = window.Top;
                 double windowLeft = window.Left;
+                HideType hiddenShowType = ResolveHiddenShowType(screenBounds, windowWidth, GetWindowHeight());
 
                 window.Visibility = Visibility.Visible;
                 //左侧显示
-                if (windowLeft <= screenLeft - showMarginWidth)
+                if (hiddenShowType == HideType.LEFT_SHOW)
                 {
                     IS_HIDE = false;
+                    ClearHiddenState();
                     //FadeAnimation(0, 1);
                     HideAnimation(windowLeft, screenLeft, Window.LeftProperty, HideType.LEFT_SHOW);
                     return;
                 }
 
                 //上方显示
-                if (windowTop <= screenTop - showMarginWidth)
+                if (hiddenShowType == HideType.TOP_SHOW)
                 {
                     IS_HIDE = false;
+                    ClearHiddenState();
                     //FadeAnimation(0, 1);
                     HideAnimation(windowTop, screenTop, Window.TopProperty, HideType.TOP_SHOW);
                     return;
                 }
 
                 //右侧显示
-                if (windowLeft + Math.Abs(screenLeft) == screenWidth - showMarginWidth)
+                if (hiddenShowType == HideType.RIGHT_SHOW)
                 {
                     IS_HIDE = false;
+                    ClearHiddenState();
                     //FadeAnimation(0, 1);
-                    HideAnimation(windowLeft, screenWidth - Math.Abs(screenLeft) - windowWidth, Window.LeftProperty, HideType.RIGHT_SHOW);
+                    HideAnimation(windowLeft, screenRight - windowWidth, Window.LeftProperty, HideType.RIGHT_SHOW);
                     return;
                 }
+
+                IS_HIDE = false;
+                ClearHiddenState();
             }
+        }
+
+        private static double GetWindowWidth()
+        {
+            if (!double.IsNaN(window.ActualWidth) && window.ActualWidth > 0)
+            {
+                return window.ActualWidth;
+            }
+
+            return !double.IsNaN(window.Width) && window.Width > 0 ? window.Width : 0;
+        }
+
+        private static double GetWindowHeight()
+        {
+            if (!double.IsNaN(window.ActualHeight) && window.ActualHeight > 0)
+            {
+                return window.ActualHeight;
+            }
+
+            return !double.IsNaN(window.Height) && window.Height > 0 ? window.Height : 0;
         }
 
 
@@ -225,77 +424,92 @@ namespace GeekDesk.Util
 
             new Thread(() =>
             {
-                App.Current.Dispatcher.Invoke(() =>
+                try
                 {
+                    App.Current.Dispatcher.Invoke(() =>
+                    {
 
-                    switch (hideType)
-                    {
-                        case HideType.LEFT_SHOW:
-                            to -= 20;
-                            break;
-                        case HideType.RIGHT_SHOW:
-                            to += 20;
-                            break;
-                        case HideType.TOP_SHOW:
-                            to -= 20;
-                            break;
-                    }
-
-                    double abs = Math.Abs(Math.Abs(to) - Math.Abs(from));
-
-                    if (hideType <= HideType.RIGHT_SHOW)
-                    {
-                        animalTime = showTime;                        
-                    } else
-                    {
-                        animalTime = hideTime;
-                    }
-                    double subLen = abs / animalTime;
-                    int count = 0;
-                    while (count < animalTime)
-                    {
                         switch (hideType)
                         {
-                            case HideType.LEFT_HIDE:
-                                window.Left -= subLen;
-                                break;
                             case HideType.LEFT_SHOW:
-                                window.Left += subLen;
-                                break;
-                            case HideType.RIGHT_HIDE:
-                                window.Left += subLen;
+                                to -= 20;
                                 break;
                             case HideType.RIGHT_SHOW:
-                                window.Left -= subLen;
-                                break;
-                            case HideType.TOP_HIDE:
-                                window.Top -= subLen;
+                                to += 20;
                                 break;
                             case HideType.TOP_SHOW:
-                                window.Top += subLen;
+                                to -= 20;
                                 break;
                         }
-                        count++;
-                        Thread.Sleep(1);
-                    }
 
-                    switch (hideType)
+                        double abs = Math.Abs(Math.Abs(to) - Math.Abs(from));
+
+                        if (hideType <= HideType.RIGHT_SHOW)
+                        {
+                            animalTime = showTime;
+                        }
+                        else
+                        {
+                            animalTime = hideTime;
+                        }
+                        double subLen = abs / animalTime;
+                        int count = 0;
+                        while (count < animalTime)
+                        {
+                            switch (hideType)
+                            {
+                                case HideType.LEFT_HIDE:
+                                    window.Left -= subLen;
+                                    break;
+                                case HideType.LEFT_SHOW:
+                                    window.Left += subLen;
+                                    break;
+                                case HideType.RIGHT_HIDE:
+                                    window.Left += subLen;
+                                    break;
+                                case HideType.RIGHT_SHOW:
+                                    window.Left -= subLen;
+                                    break;
+                                case HideType.TOP_HIDE:
+                                    window.Top -= subLen;
+                                    break;
+                                case HideType.TOP_SHOW:
+                                    window.Top += subLen;
+                                    break;
+                            }
+                            count++;
+                            Thread.Sleep(1);
+                        }
+
+                        switch (hideType)
+                        {
+                            case HideType.TOP_HIDE:
+                                window.Top = to;
+                                break;
+                            case HideType.TOP_SHOW:
+                                window.Top = to;
+                                break;
+                            default:
+                                window.Left = to;
+                                break;
+                        }
+                        if (hideType > HideType.RIGHT_SHOW)
+                        {
+                            window.Visibility = Visibility.Collapsed;
+                        }
+                        else
+                        {
+                            ClearHiddenState();
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    App.Current.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        case HideType.TOP_HIDE:
-                            window.Top = to;
-                            break;
-                        case HideType.TOP_SHOW:
-                            window.Top = to;
-                            break;
-                        default:
-                        window.Left = to;
-                        break;
-                    }
-                    if (hideType > HideType.RIGHT_SHOW)
-                    {
-                        window.Visibility = Visibility.Collapsed;
-                    }
-                });
+                        LogUtil.WriteErrorLog(ex, "贴边隐藏动画异常!");
+                    }));
+                }
             }).Start();
             
             
@@ -352,4 +566,3 @@ namespace GeekDesk.Util
 
     }
 }
-

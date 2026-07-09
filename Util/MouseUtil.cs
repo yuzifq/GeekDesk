@@ -11,6 +11,14 @@ namespace GeekDesk.Util
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool GetCursorPos(ref Win32Point pt);
 
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        private const int SM_XVIRTUALSCREEN = 76;
+        private const int SM_YVIRTUALSCREEN = 77;
+        private const int SM_CXVIRTUALSCREEN = 78;
+        private const int SM_CYVIRTUALSCREEN = 79;
+
         [StructLayout(LayoutKind.Sequential)]
         internal struct Win32Point
         {
@@ -27,6 +35,92 @@ namespace GeekDesk.Util
             var w32Mouse = new Win32Point();
             GetCursorPos(ref w32Mouse);
             return new Point(w32Mouse.X, w32Mouse.Y);
+        }
+
+        /// <summary>
+        /// 获取鼠标在窗口内的坐标，统一 Win32 屏幕像素与 WPF 逻辑单位。
+        /// </summary>
+        public static Point GetMousePositionInWindow(Window window)
+        {
+            Point logicalScreenPosition = GetMouseLogicalScreenPosition(window);
+            return new Point(logicalScreenPosition.X - window.Left, logicalScreenPosition.Y - window.Top);
+        }
+
+        public static Point GetMouseLogicalScreenPosition(Window window)
+        {
+            return ScreenToLogical(window, GetMousePosition());
+        }
+
+        public static Rect GetVirtualScreenBounds(Window window)
+        {
+            double screenLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+            double screenTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+            double screenRight = screenLeft + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+            double screenBottom = screenTop + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+
+            Point logicalTopLeft = ScreenToLogical(window, new Point(screenLeft, screenTop));
+            Point logicalBottomRight = ScreenToLogical(window, new Point(screenRight, screenBottom));
+            return new Rect(logicalTopLeft, logicalBottomRight);
+        }
+
+        private static Point ScreenToLogical(Window window, Point screenPosition)
+        {
+            return GetTransformFromDevice(window).Transform(screenPosition);
+        }
+
+        private static Matrix GetTransformFromDevice(Window window)
+        {
+            PresentationSource source = PresentationSource.FromVisual(window);
+
+            if (source?.CompositionTarget != null)
+            {
+                return source.CompositionTarget.TransformFromDevice;
+            }
+
+            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                System.Windows.Interop.HwndSource hwndSource = System.Windows.Interop.HwndSource.FromHwnd(handle);
+                if (hwndSource?.CompositionTarget != null)
+                {
+                    return hwndSource.CompositionTarget.TransformFromDevice;
+                }
+            }
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(window);
+            return new Matrix(1d / dpi.DpiScaleX, 0, 0, 1d / dpi.DpiScaleY, 0, 0);
+        }
+
+        public static bool IsMouseInWindow(Window window)
+        {
+            if (window == null)
+            {
+                return false;
+            }
+
+            Point mousePosition = GetMousePositionInWindow(window);
+            double windowWidth = GetWindowLength(window.ActualWidth, window.Width);
+            double windowHeight = GetWindowLength(window.ActualHeight, window.Height);
+
+            return mousePosition.X >= 0
+                && mousePosition.X <= windowWidth
+                && mousePosition.Y >= 0
+                && mousePosition.Y <= windowHeight;
+        }
+
+        private static double GetWindowLength(double actualLength, double configuredLength)
+        {
+            if (!double.IsNaN(actualLength) && actualLength > 0)
+            {
+                return actualLength;
+            }
+
+            if (!double.IsNaN(configuredLength) && configuredLength > 0)
+            {
+                return configuredLength;
+            }
+
+            return 0;
         }
 
 

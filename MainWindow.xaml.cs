@@ -15,6 +15,7 @@ using Microsoft.Win32;
 using NPinyin;
 using ShowSeconds;
 using System;
+using System.ComponentModel;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -28,6 +29,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Media.Media3D;
 using System.Windows.Shell;
@@ -50,6 +52,11 @@ namespace GeekDesk
         public static int colorPickerHotKeyId = -1;
         public static MainWindow mainWindow;
 
+        private const int ShowAnimationMilliseconds = 140;
+        private const int HideAnimationMilliseconds = 90;
+        private Effect mainPanelEffect;
+        private ScaleTransform mainPanelScaleTransform;
+        private bool panelEffectSuspended;
        
 
         private static bool dataFileExist = true;
@@ -59,6 +66,13 @@ namespace GeekDesk
             //加载数据
             LoadData();
             InitializeComponent();
+            mainPanelEffect = BGBorder.Effect;
+            mainPanelScaleTransform = BGBorder.RenderTransform as ScaleTransform;
+            if (mainPanelScaleTransform == null)
+            {
+                mainPanelScaleTransform = new ScaleTransform(1, 1);
+                BGBorder.RenderTransform = mainPanelScaleTransform;
+            }
 
             //用于其他类访问
             mainWindow = this;
@@ -308,6 +322,7 @@ namespace GeekDesk
 
             this.Width = appData.AppConfig.WindowWidth;
             this.Height = appData.AppConfig.WindowHeight;
+            RestoreMainWindowPosition();
         }
 
         /// <summary>
@@ -324,7 +339,7 @@ namespace GeekDesk
             }
             else
             {
-                ShowApp();
+                ShowApp(!appData.AppConfig.RememberMainWindowPosition);
             }
             //给任务栏图标一个名字
             BarIcon.Text = Constants.MY_NAME;
@@ -543,7 +558,16 @@ namespace GeekDesk
         {
             if (e.LeftButton == MouseButtonState.Pressed)
             {
-                DragMove();
+                try
+                {
+                    SuspendMainPanelEffect();
+                    DragMove();
+                }
+                finally
+                {
+                    RestoreMainPanelEffect();
+                    SaveMainWindowPosition();
+                }
             }
         }
 
@@ -583,7 +607,7 @@ namespace GeekDesk
         {
             ShowApp();
         }
-        public static void ShowApp()
+        public static void ShowApp(bool allowFollowMouse = true)
         {
             //有全屏化应用则不显示
             //if (CommonCode.IsPrimaryFullScreen())
@@ -594,7 +618,7 @@ namespace GeekDesk
             if (MarginHide.ON_HIDE)
             {
                 //修改贴边隐藏状态为未隐藏
-                MarginHide.IS_HIDE = false;
+                MarginHide.CancelHiddenState();
                 if (!CommonCode.MouseInWindow(mainWindow))
                 {
                     RunTimeStatus.MARGIN_HIDE_AND_OTHER_SHOW = true;
@@ -602,7 +626,7 @@ namespace GeekDesk
                 }
             }
 
-            if (appData.AppConfig.FollowMouse)
+            if (allowFollowMouse && appData.AppConfig.FollowMouse)
             {
                 ShowWindowFollowMouse.Show(mainWindow, MousePosition.CENTER, 0, 0);
                 //ShowWindowFollowMouse.FollowMouse(mainWindow);
@@ -614,16 +638,14 @@ namespace GeekDesk
             //mainWindow.Visibility = Visibility.Visible;
             if (appData.AppConfig.AppAnimation)
             {
-                appData.AppConfig.IsShow = true;
+                appData.AppConfig.IsShow = null;
+                mainWindow.PlayShowAnimation();
             }
             else
             {
                 appData.AppConfig.IsShow = null;
                 //防止永远不显示界面
-                if (mainWindow.Opacity < 1)
-                {
-                    mainWindow.Opacity = 1;
-                }
+                mainWindow.ResetMainPanelAnimationState();
             }
 
 
@@ -644,14 +666,118 @@ namespace GeekDesk
         {
             if (appData.AppConfig.AppAnimation)
             {
-                appData.AppConfig.IsShow = false;
+                appData.AppConfig.IsShow = null;
+                mainWindow.PlayHideAnimation(HideAppVis);
             }
             else
             {
                 appData.AppConfig.IsShow = null;
+                mainWindow.ResetMainPanelAnimationState();
                 HideAppVis();
             }
 
+        }
+
+        private void PlayShowAnimation()
+        {
+            StopMainPanelAnimations();
+            SuspendMainPanelEffect();
+
+            BGBorder.Opacity = 0;
+            mainPanelScaleTransform.ScaleX = 0.96;
+            mainPanelScaleTransform.ScaleY = 0.96;
+
+            IEasingFunction easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+            DoubleAnimation opacityAnimation = CreatePanelAnimation(1, ShowAnimationMilliseconds, easing);
+            DoubleAnimation scaleXAnimation = CreatePanelAnimation(1, ShowAnimationMilliseconds, easing);
+            DoubleAnimation scaleYAnimation = CreatePanelAnimation(1, ShowAnimationMilliseconds, easing);
+
+            opacityAnimation.Completed += (s, e) =>
+            {
+                StopMainPanelAnimations();
+                ResetMainPanelAnimationState();
+            };
+
+            BGBorder.BeginAnimation(OpacityProperty, opacityAnimation);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnimation);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnimation);
+        }
+
+        private void PlayHideAnimation(Action completed)
+        {
+            StopMainPanelAnimations();
+            SuspendMainPanelEffect();
+
+            IEasingFunction easing = new CubicEase { EasingMode = EasingMode.EaseIn };
+            DoubleAnimation opacityAnimation = CreatePanelAnimation(0, HideAnimationMilliseconds, easing);
+            DoubleAnimation scaleXAnimation = CreatePanelAnimation(0.985, HideAnimationMilliseconds, easing);
+            DoubleAnimation scaleYAnimation = CreatePanelAnimation(0.985, HideAnimationMilliseconds, easing);
+
+            opacityAnimation.Completed += (s, e) =>
+            {
+                StopMainPanelAnimations();
+                completed?.Invoke();
+                ResetMainPanelAnimationState();
+            };
+
+            BGBorder.BeginAnimation(OpacityProperty, opacityAnimation);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, scaleXAnimation);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, scaleYAnimation);
+        }
+
+        private static DoubleAnimation CreatePanelAnimation(double to, int milliseconds, IEasingFunction easing)
+        {
+            DoubleAnimation animation = new DoubleAnimation
+            {
+                To = to,
+                Duration = new Duration(TimeSpan.FromMilliseconds(milliseconds)),
+                EasingFunction = easing,
+                FillBehavior = FillBehavior.HoldEnd
+            };
+            Timeline.SetDesiredFrameRate(animation, 60);
+            return animation;
+        }
+
+        private void StopMainPanelAnimations()
+        {
+            BGBorder.BeginAnimation(OpacityProperty, null);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            mainPanelScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        }
+
+        private void ResetMainPanelAnimationState()
+        {
+            BGBorder.Opacity = 1;
+            mainPanelScaleTransform.ScaleX = 1;
+            mainPanelScaleTransform.ScaleY = 1;
+            RestoreMainPanelEffect();
+        }
+
+        private void SuspendMainPanelEffect()
+        {
+            if (panelEffectSuspended)
+            {
+                return;
+            }
+
+            if (BGBorder.Effect != null)
+            {
+                mainPanelEffect = BGBorder.Effect;
+            }
+
+            BGBorder.Effect = null;
+            panelEffectSuspended = true;
+        }
+
+        private void RestoreMainPanelEffect()
+        {
+            if (!panelEffectSuspended)
+            {
+                return;
+            }
+
+            BGBorder.Effect = mainPanelEffect;
+            panelEffectSuspended = false;
         }
 
         private static void HideAppVis()
@@ -837,6 +963,84 @@ namespace GeekDesk
             {
                 Guide();
             }
+        }
+
+        private void Window_Closing(object sender, CancelEventArgs e)
+        {
+            SaveMainWindowPosition();
+        }
+
+        private void RestoreMainWindowPosition()
+        {
+            if (!appData.AppConfig.RememberMainWindowPosition
+                || !IsValidCoordinate(appData.AppConfig.MainWindowLeft)
+                || !IsValidCoordinate(appData.AppConfig.MainWindowTop))
+            {
+                return;
+            }
+
+            Rect screenBounds = MouseUtil.GetVirtualScreenBounds(this);
+            double windowWidth = GetWindowLength(ActualWidth, Width);
+            double windowHeight = GetWindowLength(ActualHeight, Height);
+
+            Left = Clamp(appData.AppConfig.MainWindowLeft, screenBounds.Left, screenBounds.Right - windowWidth);
+            Top = Clamp(appData.AppConfig.MainWindowTop, screenBounds.Top, screenBounds.Bottom - windowHeight);
+        }
+
+        private void SaveMainWindowPosition()
+        {
+            if (appData == null || !appData.AppConfig.RememberMainWindowPosition)
+            {
+                return;
+            }
+
+            if ((MarginHide.ON_HIDE && MarginHide.IS_HIDE)
+                || !IsValidCoordinate(Left)
+                || !IsValidCoordinate(Top))
+            {
+                return;
+            }
+
+            if (!IsValidCoordinate(appData.AppConfig.MainWindowLeft)
+                || Math.Abs(appData.AppConfig.MainWindowLeft - Left) > 0.5)
+            {
+                appData.AppConfig.MainWindowLeft = Left;
+            }
+
+            if (!IsValidCoordinate(appData.AppConfig.MainWindowTop)
+                || Math.Abs(appData.AppConfig.MainWindowTop - Top) > 0.5)
+            {
+                appData.AppConfig.MainWindowTop = Top;
+            }
+        }
+
+        private static bool IsValidCoordinate(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+        }
+
+        private static double Clamp(double value, double min, double max)
+        {
+            if (max < min)
+            {
+                return min;
+            }
+            return Math.Max(min, Math.Min(max, value));
+        }
+
+        private static double GetWindowLength(double actualLength, double configuredLength)
+        {
+            if (!double.IsNaN(actualLength) && actualLength > 0)
+            {
+                return actualLength;
+            }
+
+            if (!double.IsNaN(configuredLength) && configuredLength > 0)
+            {
+                return configuredLength;
+            }
+
+            return 0;
         }
 
 

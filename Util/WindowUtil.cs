@@ -136,12 +136,40 @@ namespace GeekDesk.Util
         private const int WS_MAXIMIZEBOX = 0x10000;
         private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new IntPtr(-2);
+        private static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
 
         public static void DisableMaxWindow(Window window)
         {
             var hwnd = new WindowInteropHelper(window).Handle;
             var value = GetWindowLong(hwnd, GWL_STYLE);
             SetWindowLong(hwnd, GWL_STYLE, (int)(value & ~WS_MAXIMIZEBOX));
+        }
+
+        public static void SendToBottomNoActivate(Window window)
+        {
+            if (window == null)
+            {
+                return;
+            }
+
+            IntPtr handle = new WindowInteropHelper(window).Handle;
+            if (handle == IntPtr.Zero)
+            {
+                return;
+            }
+
+            SetWindowPos(
+                new HandleRef(window, handle),
+                new HandleRef(null, HWND_BOTTOM),
+                0,
+                0,
+                0,
+                0,
+                (int)(SetWindowPosFlags.SWP_NOMOVE
+                    | SetWindowPosFlags.SWP_NOSIZE
+                    | SetWindowPosFlags.SWP_NOACTIVATE
+                    | SetWindowPosFlags.SWP_NOOWNERZORDER
+                    | SetWindowPosFlags.SWP_SHOWWINDOW));
         }
 
         public static void ApplyTopmostSetting(Window window, bool topmost)

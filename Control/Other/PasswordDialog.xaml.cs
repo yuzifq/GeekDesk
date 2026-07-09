@@ -208,6 +208,25 @@ namespace GeekDesk.Control.Other
             P4.Clear();
         }
 
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            CancelPasswordDialog();
+        }
+
+        private void CancelPasswordDialog()
+        {
+            tempPassword = null;
+            tempType = PasswordType.INPUT;
+            count = 0;
+            ClearVal();
+            HintBox.Clear();
+            ErrorMsg.Visibility = Visibility.Collapsed;
+            HintMsg.Visibility = Visibility.Hidden;
+            PasswordGrid.Visibility = Visibility.Visible;
+            HintGrid.Visibility = Visibility.Collapsed;
+            MainWindow.mainWindow.RightCard.PDDialog.Visibility = Visibility.Collapsed;
+        }
+
         /// <summary>
         /// 跳过设置密码提示
         /// </summary>

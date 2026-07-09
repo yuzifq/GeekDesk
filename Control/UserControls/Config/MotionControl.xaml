@@ -30,6 +30,11 @@
                           Content="启动时显示主面板" IsChecked="{Binding StartedShowPanel}"/>
             </hc:UniformSpacingPanel>
 
+            <hc:UniformSpacingPanel Spacing="10" Margin="10,5,0,0"  Grid.ColumnSpan="4">
+                <CheckBox Style="{StaticResource MyCheckBoxStyle}"
+                          Content="启动时记住上次关闭位置" IsChecked="{Binding RememberMainWindowPosition}"/>
+            </hc:UniformSpacingPanel>
+
             <hc:UniformSpacingPanel Spacing="10" Margin="10,5,0,0" Grid.ColumnSpan="4">
                 <CheckBox Style="{StaticResource MyCheckBoxStyle}"
                           Content="显示时追随鼠标位置" IsChecked="{Binding FollowMouse}"/>

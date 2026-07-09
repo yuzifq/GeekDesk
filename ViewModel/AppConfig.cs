@@ -6,6 +6,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Runtime.Serialization;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -31,6 +32,12 @@ namespace GeekDesk.ViewModel
         private Visibility titleLogoVisible = Visibility.Visible; // 标题logo是否显示
         private AppHideType appHideType = AppHideType.START_EXE;  //面板关闭方式 (默认启动程序后)
         private bool startedShowPanel = true;  //启动时是否显示主面板  默认显示
+        [OptionalField]
+        private bool rememberMainWindowPosition = false; //启动时是否恢复上次关闭程序时的主面板位置
+        [OptionalField]
+        private double mainWindowLeft = double.NaN; //上次关闭程序时的主面板横向位置
+        [OptionalField]
+        private double mainWindowTop = double.NaN; //上次关闭程序时的主面板纵向位置
         [field: NonSerialized]
         private BitmapImage bitmapImage; //位图
         private byte[] imageByteArr; //背景图片 byte数组
@@ -951,6 +958,45 @@ namespace GeekDesk.ViewModel
             {
                 startedShowPanel = value;
                 OnPropertyChanged("StartedShowPanel");
+            }
+        }
+
+        public bool RememberMainWindowPosition
+        {
+            get
+            {
+                return rememberMainWindowPosition;
+            }
+            set
+            {
+                rememberMainWindowPosition = value;
+                OnPropertyChanged("RememberMainWindowPosition");
+            }
+        }
+
+        public double MainWindowLeft
+        {
+            get
+            {
+                return mainWindowLeft;
+            }
+            set
+            {
+                mainWindowLeft = value;
+                OnPropertyChanged("MainWindowLeft");
+            }
+        }
+
+        public double MainWindowTop
+        {
+            get
+            {
+                return mainWindowTop;
+            }
+            set
+            {
+                mainWindowTop = value;
+                OnPropertyChanged("MainWindowTop");
             }
         }
 
