@@ -1,19 +1,12 @@
 # GeekDesk 二创维护仓库
 
-## 仓库定位
-
-本仓库是基于 BookerLiu/GeekDesk 的个人二创维护版本，用于保存本地修复、兼容性调整和后续自用改动。
-
-上游项目：
-
-- GitHub: https://github.com/BookerLiu/GeekDesk
-- 原许可证: Apache License 2.0
+简体中文 | [English](./README.en.md)
 
 
 # GeekDesk 极客桌面
 小巧、**美观**的桌面快速启动管理工具, 同时集成了Everything搜索
-- [中文介绍](README-zh.md)
-- [English-machine translation](README.md)  
+- [中文介绍](README.md)
+- [English](README.en.md)
  
 <img src="https://s4.ax1x.com/2021/12/15/TSrwfU.png" a border="0" width="800px"/>
 
